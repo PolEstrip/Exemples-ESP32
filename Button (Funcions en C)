@@ -1,12 +1,17 @@
-#define BUTTON_PIN 13  // GPIO21 pin connected to button
+#define BUTTON_PIN 12  // GPIO21 pin connected to button
 #define DEBOUNCE_TIME  50 // debounce time in milliseconds
+
+
 
 
 // Variables for debounce logic
 int lastSteadyState = LOW;
 int lastFlickerableState = LOW;
 int currentState;
+int contador = 0;//Aqui creem la variable contador
 unsigned long lastDebounceTime = 0;
+
+
 
 
 void setup() {
@@ -15,14 +20,20 @@ void setup() {
 }
 
 
+
+
 bool button() {
  currentState = digitalRead(BUTTON_PIN);
+
+
 
 
  if (currentState != lastFlickerableState) {
    lastDebounceTime = millis();
    lastFlickerableState = currentState;
  }
+
+
 
 
  if ((millis() - lastDebounceTime) > DEBOUNCE_TIME) {
@@ -34,13 +45,20 @@ bool button() {
  }
 
 
+
+
  // Retorna false si no hi ha canvi o el botó no està premut
  return false;
 }
 
 
+//Aqui sera on mostrarem el contador
 void loop() {
  if (button()) {
-   Serial.println("Botó premut");
+   contador += 1; //Aqui sumarem 1 al contador
+   Serial.print("Has donat ");
+   Serial.print(contador);
+   Serial.print(" vegades al boto.");
+   Serial.println();
  }
 }
