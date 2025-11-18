@@ -1,0 +1,29 @@
+//aqui estic definint les variables una és la del PIN i l'altra són les durades d'encesa i apagada
+const int led = 21;
+int ences= 2000;
+int apagat= 1000;
+void setup() {
+//aqui estic posant el mode del pin
+pinMode(led, OUTPUT);
+}
+void loop() {
+digitalWrite(led, HIGH);
+//el temps d'encesa serà igual que el temps de la variable ences
+delay(encendido);
+//apagem el pin
+digitalWrite(led, LOW);
+//el temps d'encès sàrria igual que el temps de la variable apagat
+delay(apagado);
+//aqui li agreguem temps a l'encesa i apagada
+ences+=100;
+apagado +=100;
+//aqui agreguem condicionals que si encès és igual o superior a 7000 es reinicia
+if(ences >=7000){
+ences = 2000;
+}
+//aqui agreguem condicionals que si apagat és igual o superior a 7000 es reinicia
+if(apagat >=6000){
+apagat = 1000;
+}
+}
+
