@@ -1,72 +1,143 @@
-// Learn about the ESP32 WiFi simulation in
-// https://docs.wokwi.com/guides/esp32-wifi
-
 #include <WiFi.h>
-#include <Wire.h>
-#include <LiquidCrystal_I2C.h>
+#include <HTTPClient.h>
+#include <time.h>
 
-LiquidCrystal_I2C LCD = LiquidCrystal_I2C(0x27, 16, 2);
+// ===== CONFIGURACIÓN WiFi =====
+const char* ssid = "iPhone de Pol";           // ← CAMBIA ESTO por tu WiFi
+const char* password = "28Pol123";   // ← CAMBIA ESTO por tu contraseña
 
 #define NTP_SERVER     "pool.ntp.org"
-#define UTC_OFFSET     0
-#define UTC_OFFSET_DST 0
+#define UTC_OFFSET     3600      // UTC+1 (en segundos, para España)
+#define UTC_OFFSET_DST 3600      // Horario de verano
 
-void spinner() {
-  static int8_t counter = 0;
-  const char* glyphs = "\xa1\xa5\xdb";
-  LCD.setCursor(15, 1);
-  LCD.print(glyphs[counter++]);
-  if (counter == strlen(glyphs)) {
-    counter = 0;
+// Variables globales
+unsigned long lastHTTPRequest = 0;
+const unsigned long HTTP_INTERVAL = 10000; // 10 segundos entre peticiones
+int requestCount = 0;
+
+void connectToWiFi() {
+  Serial.println("\n\nIniciando conexión WiFi...");
+  Serial.print("Conectando a: ");
+  Serial.println(ssid);
+
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    delay(500);
+    Serial.print(".");
+    attempts++;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n✓ WiFi conectado!");
+    Serial.print("IP address: ");
+    Serial.println(WiFi.localIP());
+    Serial.print("SSID: ");
+    Serial.println(WiFi.SSID());
+    Serial.print("Signal strength (RSSI): ");
+    Serial.print(WiFi.RSSI());
+    Serial.println(" dBm");
+  } else {
+    Serial.println("\n✗ Error: No se pudo conectar a WiFi");
+    Serial.println("Verifica SSID y contraseña");
   }
 }
 
 void printLocalTime() {
-  struct tm timeinfo;
-  if (!getLocalTime(&timeinfo)) {
-    LCD.setCursor(0, 1);
-    LCD.println("Connection Err");
+  time_t now = time(nullptr);
+  struct tm* timeinfo = localtime(&now);
+
+  Serial.print("Hora: ");
+  Serial.print(asctime(timeinfo));
+}
+
+void checkInternetService() {
+  if (millis() - lastHTTPRequest < HTTP_INTERVAL) {
     return;
   }
 
-  LCD.setCursor(8, 0);
-  LCD.println(&timeinfo, "%H:%M:%S");
+  lastHTTPRequest = millis();
 
-  LCD.setCursor(0, 1);
-  LCD.println(&timeinfo, "%d/%m/%Y   %Z");
+  Serial.println("\n[HTTP] Haciendo petición...");
+
+  HTTPClient http;
+
+  // Petición a un servicio HTTP
+  String url = "http://httpbin.org/ip";
+
+  if (http.begin(url)) {
+    int httpResponseCode = http.GET();
+
+    if (httpResponseCode > 0) {
+      Serial.print("[HTTP] Código de respuesta: ");
+      Serial.println(httpResponseCode);
+
+      String payload = http.getString();
+      Serial.println("[HTTP] Respuesta:");
+      Serial.println(payload);
+
+      requestCount++;
+      Serial.print("[HTTP] Total de peticiones exitosas: ");
+      Serial.println(requestCount);
+    } else {
+      Serial.print("[HTTP] Error: ");
+      Serial.println(http.errorToString(httpResponseCode));
+    }
+    http.end();
+  } else {
+    Serial.println("[HTTP] Error de conexión");
+  }
 }
 
 void setup() {
   Serial.begin(115200);
+  delay(1000);
 
-  LCD.init();
-  LCD.backlight();
-  LCD.setCursor(0, 0);
-  LCD.print("Connecting to ");
-  LCD.setCursor(0, 1);
-  LCD.print("WiFi ");
+  Serial.println("\n\n================================");
+  Serial.println("ESP32 - WiFi + NTP + HTTP");
+  Serial.println("================================");
 
-  WiFi.begin("Wokwi-GUEST", "", 6);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(250);
-    spinner();
-  }
+  // Conectar a WiFi
+  connectToWiFi();
 
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
-
-  LCD.clear();
-  LCD.setCursor(0, 0);
-  LCD.println("Online");
-  LCD.setCursor(0, 1);
-  LCD.println("Updating time...");
-
+  // Configurar NTP para obtener la hora
+  Serial.println("\nActualizando hora via NTP...");
   configTime(UTC_OFFSET, UTC_OFFSET_DST, NTP_SERVER);
+
+  // Esperar a que se sincronice la hora
+  time_t now = time(nullptr);
+  int attempts = 0;
+  while (now < 24 * 3600 && attempts < 30) {
+    delay(500);
+    Serial.print(".");
+    now = time(nullptr);
+    attempts++;
+  }
+  Serial.println();
+
+  Serial.println("\n✓ Hora sincronizada!");
+  printLocalTime();
+
+  Serial.println("\n================================");
+  Serial.println("Sistema listo");
+  Serial.println("================================\n");
 }
 
 void loop() {
+  // Verificar conexión WiFi
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("\n⚠ Conexión WiFi perdida. Reconectando...");
+    connectToWiFi();
+  }
+
+  // Mostrar la hora
   printLocalTime();
-  delay(250);
+
+  // Hacer peticiones HTTP periódicas
+  checkInternetService();
+
+  // Actualizar cada segundo
+  delay(1000);
 }
